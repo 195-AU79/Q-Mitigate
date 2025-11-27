@@ -17,6 +17,7 @@
 ## 📦 Installation
 
 ```bash
-git clone [https://github.com/VOTRE_USERNAME/Q-Mitigate.git](https://github.com/VOTRE_USERNAME/Q-Mitigate.git)
+git clone [https://github.com/195-AU79/Q-Mitigate.git](https://github.com/.../Q-Mitigate.git)
 cd Q-Mitigate
 pip install -r requirements.txt
+
