@@ -87,6 +87,10 @@ class ErrorMitigationModule:
             # Noise amplification via gate pair insertion (Unitary Folding)
             scaled_circuit = self._scale_noise(circuit, scale)
             
+            # Ensure circuit has measurements
+            if not self._has_measurements(scaled_circuit):
+                scaled_circuit.measure_all()
+            
             # Execution
             counts = self._execute_circuit(scaled_circuit)
             
@@ -132,33 +136,54 @@ class ErrorMitigationModule:
         but doubles the physical noise experienced by the qubits.
         """
         if scale_factor == 1:
-            return circuit
+            return circuit.copy()
         
-        scaled_qc = QuantumCircuit(circuit.num_qubits, circuit.num_clbits)
+        # Create a copy to avoid modifying the original circuit
+        scaled_qc = circuit.copy()
         
         num_repetitions = int(scale_factor)
         
-        for instr, qargs, cargs in circuit.data:
+        # If scale_factor is 1, return original
+        if num_repetitions <= 1:
+            return scaled_qc
+        
+        # We'll insert barriers and duplicate gates
+        # For simplicity, we'll add identity pairs after each gate
+        new_data = []
+        for instr, qargs, cargs in scaled_qc.data:
             # Original instruction
-            scaled_qc.append(instr, qargs, cargs)
+            new_data.append((instr, qargs, cargs))
             
             # Add identity pairs to amplify noise
             if instr.name in ['cx', 'cz'] and num_repetitions > 1:
                 for _ in range(num_repetitions - 1):
-                    # CRITICAL: Barrier prevents compiler optimization
-                    scaled_qc.barrier() 
-                    # Add G then G^-1
-                    scaled_qc.append(instr, qargs, cargs)
-                    scaled_qc.append(instr, qargs, cargs)
+                    # Add barrier
+                    from qiskit.circuit import Barrier
+                    barrier = Barrier(len(qargs))
+                    new_data.append((barrier, qargs, []))
+                    # Add G then G^-1 (which is G again for CNOT/CZ)
+                    new_data.append((instr, qargs, cargs))
+                    new_data.append((instr, qargs, cargs))
             
             elif instr.name in ['rx', 'ry', 'rz', 'u3'] and num_repetitions > 1:
                 for _ in range(num_repetitions - 1):
-                    scaled_qc.barrier()
+                    from qiskit.circuit import Barrier
+                    barrier = Barrier(len(qargs))
+                    new_data.append((barrier, qargs, []))
                     # For rotations, do theta then -theta
-                    scaled_qc.append(instr, qargs, cargs)
-                    scaled_qc.append(instr.inverse(), qargs, cargs)
+                    new_data.append((instr, qargs, cargs))
+                    try:
+                        new_data.append((instr.inverse(), qargs, cargs))
+                    except:
+                        # If inverse doesn't work, just duplicate
+                        new_data.append((instr, qargs, cargs))
         
-        return scaled_qc
+        # Create new circuit with modified data
+        scaled_qc_new = QuantumCircuit(scaled_qc.num_qubits, scaled_qc.num_clbits)
+        for instr, qargs, cargs in new_data:
+            scaled_qc_new.append(instr, qargs, cargs)
+        
+        return scaled_qc_new
     
     def _extrapolate_to_zero(self, 
                              scale_factors: List[float], 
@@ -228,7 +253,7 @@ class ErrorMitigationModule:
                 label=f'Extrapolation ({method})', alpha=0.7)
         
         # Mitigated point
-        ax.scatter([0], [mitigated], s=300, c='green', marker='★',
+        ax.scatter([0], [mitigated], s=300, c='green', marker='*',
                    label='Mitigated Value (noise=0)', zorder=6,
                    edgecolors='darkgreen', linewidths=2)
         
@@ -284,7 +309,7 @@ class ErrorMitigationModule:
         
         # Step 2: Circuit Execution
         print("\n🚀 Executing target circuit...")
-        if not circuit.has_measurements():
+        if not self._has_measurements(circuit):
             circuit.measure_all()
         
         raw_counts = self._execute_circuit(circuit)
@@ -605,7 +630,7 @@ class ErrorMitigationModule:
         # Execute all circuits
         all_counts = []
         for circ in corrected_circuits:
-            if not circ.has_measurements():
+            if not self._has_measurements(circ):
                 circ.measure_all()
             counts = self._execute_circuit(circ, shots=100)
             all_counts.append(counts)
@@ -708,7 +733,7 @@ class ErrorMitigationModule:
         # 2. Raw Measurement
         print("\n" + "─"*80)
         print("\n📊 EXECUTION WITHOUT MITIGATION...")
-        if not current_circuit.has_measurements():
+        if not self._has_measurements(current_circuit):
             current_circuit.measure_all()
         
         raw_counts = self._execute_circuit(current_circuit)
@@ -789,13 +814,25 @@ class ErrorMitigationModule:
     # UTILITY METHODS
     # =====================================================================
     
+    def _has_measurements(self, circuit: QuantumCircuit) -> bool:
+        """Check if circuit has measurement operations."""
+        for instr, _, _ in circuit.data:
+            if instr.name == 'measure':
+                return True
+        return False
+    
     def _execute_circuit(self, circuit: QuantumCircuit, shots: int = 1000) -> Dict:
         """Executes a circuit on the configured backend."""
         if self.backend is not None:
             # Execution on real or simulated backend
             transpiled = transpile(circuit, self.backend)
             job = self.backend.run(transpiled, shots=shots)
-            return job.result().get_counts()
+            result = job.result()
+            # Handle both old and new result formats
+            if hasattr(result, 'get_counts'):
+                return result.get_counts(0) if hasattr(result, 'experiments') else result.get_counts()
+            else:
+                return result.get_counts(0)
         else:
             # Simulation with noise if available
             if self.noise_model:
@@ -805,7 +842,13 @@ class ErrorMitigationModule:
             
             transpiled = transpile(circuit, simulator)
             job = simulator.run(transpiled, shots=shots)
-            return job.result().get_counts()
+            result = job.result()
+            # Handle both old and new result formats
+            if hasattr(result, 'get_counts'):
+                counts = result.get_counts(0) if len(result.results) > 0 else result.get_counts()
+                return counts if counts else {}
+            else:
+                return {}
     
     def _compute_expectation_value(self, counts: Dict, 
                                  observable: np.ndarray) -> float:
