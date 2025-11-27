@@ -1,0 +1,8 @@
+qiskit>=1.0.0
+qiskit-ibm-runtime
+qiskit-aer
+numpy
+matplotlib
+seaborn
+networkx
+scipy
