@@ -1,8 +1,6 @@
 # 🛡️ Q-Mitigate: Advanced Quantum Error Mitigation
 
-![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![Qiskit](https://img.shields.io/badge/Qiskit-1.0%2B-purple)
-![License](https://img.shields.io/badge/License-MIT-green)
 
 **Q-Mitigate** is a comprehensive Python module designed to bridge the gap between noisy quantum hardware (NISQ) and theoretical results. It implements a unified pipeline of state-of-the-art error mitigation techniques.
 
@@ -20,4 +18,5 @@
 git clone [https://github.com/195-AU79/Q-Mitigate.git](https://github.com/.../Q-Mitigate.git)
 cd Q-Mitigate
 pip install -r requirements.txt
+
 
