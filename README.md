@@ -12,11 +12,19 @@
 * **Probabilistic Error Cancellation (PEC):** Implements Monte-Carlo sampling to statistically cancel gate errors.
 * **Real Hardware Analysis:** Seamless integration with IBM Quantum services via `QiskitRuntimeService`.
 
+  FR : 
+**Extrapolation à Bruit Nul (ZNE):** Extrapole les résultats vers la limite de bruit nul en utilisant le Repliement Unitaire (ajustement exponentiel/linéaire).
+**Atténuation des Erreurs de Mesure:** Calibre et inverse la matrice de confusion de lecture pour corriger les erreurs de mesure.
+**Découplage Dynamique (DD):** Insère automatiquement des séquences XY4 pour supprimer la décohérence sur les qubits au repos.
+**Annulation Probabiliste d'Erreurs (PEC):** Implémente un échantillonnage de Monte-Carlo pour annuler statistiquement les erreurs de portes.
+**Analyse sur Matériel Réel:** Intégration transparente avec les services IBM Quantum via QiskitRuntimeService.
+
 ## 📦 Installation
 
 ```bash
 git clone [https://github.com/195-AU79/Q-Mitigate.git](https://github.com/.../Q-Mitigate.git)
 cd Q-Mitigate
 pip install -r requirements.txt
+
 
 
